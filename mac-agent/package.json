@@ -1,0 +1,15 @@
+{
+  "name": "virtualdj-mac-agent",
+  "version": "1.0.0",
+  "description": "Runs on the Mac next to VirtualDJ. Connects outbound to the relay server on server.shealthmedia.org and executes VirtualDJ commands via AppleScript keystrokes (no VirtualDJ Pro license required).",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

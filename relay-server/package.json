@@ -1,0 +1,17 @@
+{
+  "name": "virtualdj-relay-server",
+  "version": "1.0.0",
+  "description": "Public relay for controlling VirtualDJ remotely: exposes an HTTP API on server.shealthmedia.org, forwards commands over WebSocket to the local Mac agent running next to VirtualDJ.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0",
+    "better-sqlite3": "^11.3.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
