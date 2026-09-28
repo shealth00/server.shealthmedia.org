@@ -17,7 +17,7 @@
  * > Accessibility).
  *
  * Env vars:
- *   RELAY_URL    wss://server.shealthmedia.org/agent  (required)
+ *   RELAY_URL    wss://server.shealthmedia.org/api/agent  (required)
  *   RELAY_TOKEN  shared secret, must match the relay server's
  *                RELAY_TOKEN (required)
  *   AGENT_ID     identifies this Mac if you run more than one

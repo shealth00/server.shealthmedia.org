@@ -6,7 +6,8 @@ Two pieces, split because the Mac running VirtualDJ is behind NAT and this
 server can't connect into it directly:
 
 - **`relay-server/`** — deploys on server.shealthmedia.org. Exposes a public
-  HTTP API and a WebSocket endpoint (`/agent`). Logs every command to SQLite.
+  HTTP API and a WebSocket endpoint, both mounted under `/api` so the same
+  domain can also serve a static site at `/`. Logs every command to SQLite.
 - **`mac-agent/`** — runs on the Mac next to VirtualDJ. Connects *out* to the
   relay's WebSocket endpoint and holds the connection open. When a command
   arrives, it executes it locally by sending keystrokes to VirtualDJ via
@@ -35,9 +36,11 @@ RELAY_TOKEN=<long-random-string> API_TOKEN=<another-long-random-string> \
 Put this behind your existing reverse proxy / process manager (pm2,
 systemd, whatever server.shealthmedia.org already uses) so it survives
 reboots and gets TLS via your normal domain setup — commands should end up
-going over `wss://server.shealthmedia.org/agent` and
-`https://server.shealthmedia.org/...`, not plain `ws://`/`http://`, once
-it's behind your TLS termination.
+going over `wss://server.shealthmedia.org/api/agent` and
+`https://server.shealthmedia.org/api/...`, not plain `ws://`/`http://`, once
+it's behind your TLS termination. The webserver should route only `/api/*`
+to this app (e.g. Passenger `PassengerBaseURI /api`) and serve everything
+else (the public site) as static files.
 
 Generate strong tokens, e.g.:
 
@@ -56,7 +59,7 @@ Grant Accessibility permission: System Settings → Privacy & Security →
 Accessibility → add/enable Terminal (or whatever runs this process).
 
 ```bash
-RELAY_URL=wss://server.shealthmedia.org/agent \
+RELAY_URL=wss://server.shealthmedia.org/api/agent \
   RELAY_TOKEN=<same-long-random-string-as-relay-server> \
   node index.js
 ```
@@ -68,11 +71,13 @@ drops.
 ### Using it
 
 ```bash
-curl "https://server.shealthmedia.org/transport?deck=A&action=play&token=<API_TOKEN>"
-curl "https://server.shealthmedia.org/transport?deck=B&action=sync&token=<API_TOKEN>"
-curl -X POST "https://server.shealthmedia.org/mix_now?token=<API_TOKEN>"
-curl "https://server.shealthmedia.org/history?token=<API_TOKEN>&limit=20"
+curl "https://server.shealthmedia.org/api/transport?deck=A&action=play&token=<API_TOKEN>"
+curl "https://server.shealthmedia.org/api/transport?deck=B&action=sync&token=<API_TOKEN>"
+curl -X POST "https://server.shealthmedia.org/api/mix_now?token=<API_TOKEN>"
+curl "https://server.shealthmedia.org/api/history?token=<API_TOKEN>&limit=20"
 ```
+
+All endpoints below are under `/api` (e.g. `/api/health`, `/api/transport`).
 
 | Endpoint | Params | Effect |
 |---|---|---|

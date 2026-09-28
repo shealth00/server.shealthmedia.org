@@ -83,8 +83,12 @@ function sendCommandToAgent(agentId, message, timeoutMs = 8000) {
 }
 
 // --- HTTP API ------------------------------------------------------------
+// Mounted under /api so this app can share server.shealthmedia.org with a
+// static site served directly by the webserver at "/".
 const app = express();
+const api = express.Router();
 app.use(express.json());
+app.use("/api", api);
 
 function checkApiAuth(req, res, next) {
   const provided = req.query.token || req.headers["x-api-token"];
@@ -92,7 +96,7 @@ function checkApiAuth(req, res, next) {
   next();
 }
 
-app.get("/health", (req, res) => {
+api.get("/health", (req, res) => {
   res.json({
     ok: true,
     agentConnected: Boolean(getAgent("default")?.ws.readyState === 1),
@@ -114,21 +118,21 @@ async function handleCommand(req, res, endpoint, message) {
   }
 }
 
-app.all("/transport", checkApiAuth, (req, res) => {
+api.all("/transport", checkApiAuth, (req, res) => {
   const deck = req.query.deck || req.body.deck;
   const action = req.query.action || req.body.action;
   handleCommand(req, res, "/transport", { type: "transport", deck, action });
 });
 
-app.all("/mix_now", checkApiAuth, (req, res) => {
+api.all("/mix_now", checkApiAuth, (req, res) => {
   handleCommand(req, res, "/mix_now", { type: "mix_now" });
 });
 
-app.all("/emergency_play", checkApiAuth, (req, res) => {
+api.all("/emergency_play", checkApiAuth, (req, res) => {
   handleCommand(req, res, "/emergency_play", { type: "emergency_play" });
 });
 
-app.all("/key", checkApiAuth, (req, res) => {
+api.all("/key", checkApiAuth, (req, res) => {
   const key = req.query.key ?? req.body.key;
   const keyCode = req.query.keyCode ?? req.body.keyCode;
   const modifiersRaw = req.query.modifiers ?? req.body.modifiers;
@@ -145,7 +149,7 @@ app.all("/key", checkApiAuth, (req, res) => {
   });
 });
 
-app.get("/history", checkApiAuth, (req, res) => {
+api.get("/history", checkApiAuth, (req, res) => {
   const limit = Math.min(parseInt(req.query.limit || "50", 10), 500);
   const rows = db.prepare(`SELECT * FROM commands ORDER BY id DESC LIMIT ?`).all(limit);
   res.json({ ok: true, rows });
@@ -153,7 +157,7 @@ app.get("/history", checkApiAuth, (req, res) => {
 
 // --- WebSocket server (Mac agent connects here) --------------------------
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: "/agent" });
+const wss = new WebSocketServer({ server, path: "/api/agent" });
 
 wss.on("connection", (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -199,5 +203,5 @@ wss.on("connection", (ws, req) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`VirtualDJ relay server listening on :${PORT} (HTTP + WS /agent)`);
+  console.log(`VirtualDJ relay server listening on :${PORT} (HTTP + WS under /api)`);
 });
