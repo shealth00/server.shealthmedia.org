@@ -100,12 +100,16 @@ api.get("/health", (req, res) => {
   res.json({
     ok: true,
     agentConnected: Boolean(getAgent("default")?.ws.readyState === 1),
+    agents: {
+      virtualdj: Boolean(getAgent("default")?.ws.readyState === 1),
+      garageband: Boolean(getAgent("garageband")?.ws.readyState === 1),
+    },
   });
 });
 
-async function handleCommand(req, res, endpoint, message) {
+async function handleCommand(req, res, endpoint, message, defaultAgentId = "default") {
   const start = Date.now();
-  const agentId = req.query.agent || "default";
+  const agentId = req.query.agent || defaultAgentId;
   try {
     const response = await sendCommandToAgent(agentId, message);
     const duration = Date.now() - start;
@@ -147,6 +151,11 @@ api.all("/key", checkApiAuth, (req, res) => {
     keyCode: keyCode !== undefined ? Number(keyCode) : undefined,
     modifiers,
   });
+});
+
+api.all("/gb/transport", checkApiAuth, (req, res) => {
+  const action = req.query.action || req.body.action;
+  handleCommand(req, res, "/gb/transport", { type: "gb_transport", action }, "garageband");
 });
 
 api.get("/history", checkApiAuth, (req, res) => {

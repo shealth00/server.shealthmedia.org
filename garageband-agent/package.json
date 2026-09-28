@@ -1,0 +1,15 @@
+{
+  "name": "garageband-agent",
+  "version": "1.0.0",
+  "description": "Runs on the Mac next to GarageBand. Connects outbound to the relay server on server.shealthmedia.org and executes GarageBand transport commands by pressing named accessibility elements via System Events.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

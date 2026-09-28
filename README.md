@@ -1,28 +1,86 @@
 # server.shealthmedia.org
 
-## VirtualDJ remote control
+## Remote control: VirtualDJ + GarageBand
 
-Two pieces, split because the Mac running VirtualDJ is behind NAT and this
-server can't connect into it directly:
+One relay, two independent Mac agents, split because the Mac running these
+apps is behind NAT and this server can't connect into it directly:
 
 - **`relay-server/`** — deploys on server.shealthmedia.org. Exposes a public
   HTTP API and a WebSocket endpoint, both mounted under `/api` so the same
   domain can also serve a static site at `/`. Logs every command to SQLite.
-- **`mac-agent/`** — runs on the Mac next to VirtualDJ. Connects *out* to the
-  relay's WebSocket endpoint and holds the connection open. When a command
-  arrives, it executes it locally by sending keystrokes to VirtualDJ via
-  AppleScript, using VirtualDJ's own default keyboard mapping.
+  Supports multiple named agents over the same WS endpoint (`?agentId=`).
+- **`mac-agent/`** — runs on the Mac next to VirtualDJ, registers as agent
+  `default`. Connects *out* to the relay's WebSocket endpoint and holds the
+  connection open. Executes commands locally by sending keystrokes to
+  VirtualDJ via AppleScript, using VirtualDJ's own default keyboard mapping.
+- **`garageband-agent/`** — same architecture, registers as agent
+  `garageband`. Unlike VirtualDJ, GarageBand exposes real macOS
+  accessibility elements for its transport controls (Play, Stop, Record,
+  Cycle, Rewind, Forward, Tuner, Count In, Metronome Click), so this agent
+  presses those named UI elements via System Events instead of guessing
+  keyboard shortcuts.
 
 No VirtualDJ Pro license required — this doesn't touch VirtualDJ's Network
-Control plugin (which is Pro-only); it drives the app the same way a
-keyboard would.
+Control plugin (which is Pro-only); it drives both apps the same way a
+keyboard/mouse would.
 
 ```
 [HTTP client / your app] --> [relay-server on server.shealthmedia.org]
                                     ^  (WebSocket, outbound from Mac)
                                     |
-                              [mac-agent on your Mac] --AppleScript--> [VirtualDJ]
+                    +---------------+---------------+
+                    |                               |
+            [mac-agent] --AppleScript--> [VirtualDJ] |
+                                                      |
+                            [garageband-agent] --System Events UI--> [GarageBand]
 ```
+
+### Both agents run as LaunchAgents
+
+Backgrounded shell processes (`node index.js &`) do not reliably stay alive
+on this Mac — they get reaped between automation sessions. Both agents are
+installed as real LaunchAgent daemons instead:
+
+- `~/Library/LaunchAgents/org.shealthmedia.vdj-mac-agent.plist`
+- `~/Library/LaunchAgents/org.shealthmedia.gb-agent.plist`
+
+Both set `RunAtLoad` + `KeepAlive`, so they survive reboots and auto-restart
+on crash. Logs go to `~/Library/Logs/vdj-mac-agent.log` and
+`~/Library/Logs/gb-agent.log`. After editing either agent's `index.js`,
+reload with:
+
+```bash
+launchctl unload ~/Library/LaunchAgents/org.shealthmedia.<name>.plist
+launchctl load ~/Library/LaunchAgents/org.shealthmedia.<name>.plist
+```
+
+### macOS permissions both agents need
+
+- **Accessibility** (System Settings → Privacy & Security → Accessibility):
+  needed to send keystrokes/UI actions at all.
+- **Automation** (System Settings → Privacy & Security → Automation): the
+  entry appears as **`node`** (not Terminal, not the agent by name) once
+  LaunchAgent-run, since `node` itself is the process sending Apple Events
+  to System Events. If the toggle won't stick (flips back off), it's a
+  stale/corrupted TCC record — run `tccutil reset AppleEvents`, then
+  trigger a command again and grant the fresh prompt when it appears.
+
+### Hosting-tier gotcha: Passenger recycling
+
+On Hostinger Business hosting (shared, Passenger/LiteSpeed-managed — not a
+VPS), the relay-server's Node process gets recycled aggressively by
+default, silently dropping the WebSocket connection every 20–30s. Fixed by
+adding to `.htaccess` alongside the existing Passenger directives:
+
+```
+PassengerMinInstances 1
+PassengerMaxInstancesPerApp 1
+PassengerPoolIdleTime 0
+PassengerStartTimeout 90
+```
+
+Also disable Hostinger's CDN for this subdomain if enabled — it doesn't
+reliably proxy persistent WebSocket connections.
 
 ### Deploy relay-server
 
@@ -75,6 +133,7 @@ curl "https://server.shealthmedia.org/api/transport?deck=A&action=play&token=<AP
 curl "https://server.shealthmedia.org/api/transport?deck=B&action=sync&token=<API_TOKEN>"
 curl -X POST "https://server.shealthmedia.org/api/mix_now?token=<API_TOKEN>"
 curl "https://server.shealthmedia.org/api/history?token=<API_TOKEN>&limit=20"
+curl -X POST "https://server.shealthmedia.org/api/gb/transport?action=play&token=<API_TOKEN>"
 ```
 
 All endpoints below are under `/api` (e.g. `/api/health`, `/api/transport`).
@@ -85,7 +144,8 @@ All endpoints below are under `/api` (e.g. `/api/health`, `/api/transport`).
 | `/transport` | `deck` (A\|B), `action` | play, cue, stop, sync, loop, loop_half, loop_double, pitch_up/down/reset, nudge_left/right, pad1..pad8, pad_page |
 | `/mix_now` | — | Automix "Mix Now" |
 | `/emergency_play` | — | Emergency Play |
-| `/key` | `key` or `keyCode`, `modifiers` | raw keystroke passthrough |
+| `/key` | `key` or `keyCode`, `modifiers` | raw keystroke passthrough (VirtualDJ agent) |
+| `/gb/transport` | `action` | GarageBand: play, stop, record, cycle, rewind, forward, tuner, count_in, metronome |
 | `/history` | `limit` | recent command log from SQLite |
 
 All (except `/health`) require `?token=<API_TOKEN>` or header `X-API-Token`.
@@ -96,6 +156,9 @@ All (except `/health`) require `?token=<API_TOKEN>` or header `X-API-Token`.
   VirtualDJ's Pro-only Network Control plugin. This is action-only.
 - If you've customized your VirtualDJ keyboard mapping, edit `DECK_KEYS` in
   `mac-agent/index.js` to match.
+- GarageBand only supports the transport actions actually exposed as named
+  accessibility elements (see `CONTROLS` in `garageband-agent/index.js`) —
+  no upload, playlist, video-control, mixer, or other DAW features.
 - If the Mac sleeps or the agent process dies, commands will 502 with
   `"Mac agent ... is not connected."` — `/health` tells you connection
   state before you rely on it.
