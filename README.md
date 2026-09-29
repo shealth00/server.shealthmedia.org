@@ -7,7 +7,7 @@ apps is behind NAT and this server can't connect into it directly:
 
 - **`relay-server/`** — deploys on server.shealthmedia.org. Exposes a public
   HTTP API and a WebSocket endpoint, both mounted under `/api` so the same
-  domain can also serve a static site at `/`. Logs every command to SQLite.
+  domain can also serve a static site at `/`. Logs every command to Supabase Postgres.
   Supports multiple named agents over the same WS endpoint (`?agentId=`).
 - **`mac-agent/`** — runs on the Mac next to VirtualDJ, registers as agent
   `default`. Connects *out* to the relay's WebSocket endpoint and holds the
@@ -88,8 +88,15 @@ reliably proxy persistent WebSocket connections.
 cd relay-server
 npm install
 RELAY_TOKEN=<long-random-string> API_TOKEN=<another-long-random-string> \
+  CLIENT_PASSWORD=<portal-password> \
+  SUPABASE_URL=https://<ref>.supabase.co \
+  SUPABASE_SERVICE_KEY=<service_role key> \
   PORT=3000 node index.js
 ```
+
+The server refuses to start if any of `RELAY_TOKEN`, `API_TOKEN`,
+`CLIENT_PASSWORD`, `SUPABASE_URL` or `SUPABASE_SERVICE_KEY` is missing —
+there is no "insecure default" mode.
 
 Put this behind your existing reverse proxy / process manager (pm2,
 systemd, whatever server.shealthmedia.org already uses) so it survives
@@ -146,9 +153,41 @@ All endpoints below are under `/api` (e.g. `/api/health`, `/api/transport`).
 | `/emergency_play` | — | Emergency Play |
 | `/key` | `key` or `keyCode`, `modifiers` | raw keystroke passthrough (VirtualDJ agent) |
 | `/gb/transport` | `action` | GarageBand: play, stop, record, cycle, rewind, forward, tuner, count_in, metronome |
-| `/history` | `limit` | recent command log from SQLite |
+| `/history` | `limit` | recent command log from Supabase Postgres |
 
 All (except `/health`) require `?token=<API_TOKEN>` or header `X-API-Token`.
+
+### Supabase setup (one time)
+
+1. In the Supabase project, run `supabase/schema.sql` (SQL Editor) to
+   create the `commands`, `episodes` and `articles` tables. RLS is enabled
+   with no policies — the relay reaches them with the `service_role` key,
+   and nothing else can.
+2. Create a **public** Storage bucket named `podcast` (or whatever you set
+   `SUPABASE_BUCKET` to). Public is deliberate: podcast audio is meant to
+   be fetched by any player, and public URLs let the CDN serve it.
+3. Copy the project URL and the `service_role` key into the relay's env.
+   The `service_role` key bypasses RLS — it belongs on the server only,
+   never in the website's JavaScript.
+
+### Content API (podcast CMS)
+
+Used by the website's client portal and public player.
+
+| Endpoint | Method | Auth | Purpose |
+|---|---|---|---|
+| `/login` | POST | — | exchange `CLIENT_PASSWORD` for a 24h session token |
+| `/logout` | POST | client | drop the session |
+| `/podcast/episodes` | GET | public | list episodes, newest first |
+| `/podcast/episodes` | POST | client | publish an episode (`title`, `description`, `audio`, optional `cover`) |
+| `/podcast/episodes/:id` | DELETE | client | delete episode + its Storage objects |
+| `/podcast/articles` | GET | public | list articles, newest first |
+| `/podcast/articles` | POST | client | publish an article (`title`, `body`, optional `cover`) |
+| `/podcast/articles/:id` | DELETE | client | delete article + its cover |
+
+Client-authenticated calls send the token as `X-Client-Token`. Sessions
+live in memory, so a relay restart signs the portal out — by design, it
+keeps the blast radius of a leaked token to one process lifetime.
 
 ### Notes / limitations
 
@@ -162,6 +201,13 @@ All (except `/health`) require `?token=<API_TOKEN>` or header `X-API-Token`.
 - If the Mac sleeps or the agent process dies, commands will 502 with
   `"Mac agent ... is not connected."` — `/health` tells you connection
   state before you rely on it.
-- `relay-server` uses SQLite (`better-sqlite3`) for the command log by
-  default; swap `relay-server/index.js`'s DB calls for this server's real
-  database if you'd rather keep it centralized there.
+- `relay-server` stores everything in Supabase: Postgres for the command
+  log and the podcast content, Supabase Storage for uploaded audio and
+  cover images. There is no local database file and no native module to
+  compile, which matters on shared hosting.
+- Podcast audio is served straight from Storage's public CDN URLs, so
+  episode downloads never pass through this process or the web host's
+  disk quota. API responses carry `audio_url` / `cover_url` alongside the
+  stored `audio_path` / `cover_path`.
+- `@supabase/supabase-js` warns on Node 20 and wants Node 22+. It runs on
+  20, but set the hPanel Node app to 22 when you can.

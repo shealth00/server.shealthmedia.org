@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>server.shealthmedia.org — Infrastructure &amp; Hosting</title>
+<meta name="description" content="Network infrastructure, server hosting, domains, DNS, SSL/TLS, deployments, monitoring, backups, security, and technical support.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="#home" class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      server<span class="brand-dim">.shealthmedia.org</span>
+    </a>
+    <nav class="main-nav" aria-label="Primary">
+      <a href="#services">Services</a>
+      <a href="#plans">Plans</a>
+      <a href="#infrastructure">Infrastructure</a>
+      <a href="#status">Status</a>
+      <a href="#podcast">Podcast</a>
+      <a href="#media">Media Server</a>
+      <a href="#docs">Docs</a>
+      <a href="#faq">FAQ</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <div class="header-actions">
+      <button class="btn btn-ghost" id="loginBtn" type="button">Client Login</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- HOME -->
+  <section id="home" class="hero">
+    <div class="container hero-inner">
+      <p class="eyebrow">Network &amp; Hosting Infrastructure</p>
+      <h1>Reliable infrastructure for the systems you run in production.</h1>
+      <p class="lead">
+        Server hosting, domains, DNS, SSL/TLS, deployments, monitoring, backups, and security —
+        documented, supported, and built to be understood, not just used.
+      </p>
+      <div class="cta-row">
+        <a href="#services" class="btn btn-primary">View Services</a>
+        <a href="#status" class="btn btn-outline">Check System Status</a>
+        <a href="#contact" class="btn btn-outline">Contact Support</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- SERVICES -->
+  <section id="services" class="section">
+    <div class="container">
+      <h2 class="section-title">Services</h2>
+      <p class="section-lead">Core infrastructure services, described plainly.</p>
+      <div class="grid grid-3">
+        <article class="card">
+          <div class="card-icon">◧</div>
+          <h3>Server Hosting</h3>
+          <p>Managed and self-managed server environments for web apps, APIs, and background services.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon">◨</div>
+          <h3>Web Hosting</h3>
+          <p>Shared and dedicated web hosting for static sites, CMS platforms, and application backends.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon">⌂</div>
+          <h3>Domains &amp; DNS</h3>
+          <p>Domain registration guidance and DNS zone configuration, including subdomains and mail records.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon">🔒</div>
+          <h3>SSL / TLS</h3>
+          <p>Certificate issuance and renewal (e.g. Let's Encrypt) with forced HTTPS across managed domains.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon">⇪</div>
+          <h3>Deployments</h3>
+          <p>Git-based and manual deployment workflows for static sites, Node.js apps, and APIs.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon">◎</div>
+          <h3>Monitoring</h3>
+          <p>Uptime and health checks for hosted services, with alerting when something needs attention.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon">⟲</div>
+          <h3>Backups</h3>
+          <p>Scheduled backups for databases and application data, with documented restore procedures.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon">🛡</div>
+          <h3>Security</h3>
+          <p>Hardened server configurations, access control, and routine patching practices.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon">📄</div>
+          <h3>Documentation &amp; Support</h3>
+          <p>Written setup guides and direct technical support for anything running on this infrastructure.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLANS -->
+  <section id="plans" class="section section-alt">
+    <div class="container">
+      <h2 class="section-title">Server &amp; Hosting Plans</h2>
+      <p class="section-lead">Illustrative tiers. Final scope and pricing are confirmed during onboarding.</p>
+      <div class="grid grid-3">
+        <article class="plan-card">
+          <h3>Starter</h3>
+          <p class="plan-desc">Small sites and low-traffic apps.</p>
+          <ul class="plan-features">
+            <li>Shared hosting environment</li>
+            <li>1 domain + free SSL</li>
+            <li>Daily backups</li>
+            <li>Email support</li>
+          </ul>
+          <a href="#contact" class="btn btn-outline btn-block">Contact Support</a>
+        </article>
+        <article class="plan-card plan-featured">
+          <span class="plan-badge">Most common</span>
+          <h3>Business</h3>
+          <p class="plan-desc">Production apps and client sites.</p>
+          <ul class="plan-features">
+            <li>Dedicated resources</li>
+            <li>Multiple domains + SSL</li>
+            <li>Automated backups &amp; monitoring</li>
+            <li>Priority support</li>
+          </ul>
+          <a href="#contact" class="btn btn-primary btn-block">Contact Support</a>
+        </article>
+        <article class="plan-card">
+          <h3>Infrastructure</h3>
+          <p class="plan-desc">Custom server &amp; network setups.</p>
+          <ul class="plan-features">
+            <li>Custom server provisioning</li>
+            <li>Advanced DNS &amp; routing</li>
+            <li>Security hardening review</li>
+            <li>Direct technical contact</li>
+          </ul>
+          <a href="#contact" class="btn btn-outline btn-block">Contact Support</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- INFRASTRUCTURE -->
+  <section id="infrastructure" class="section">
+    <div class="container">
+      <h2 class="section-title">Infrastructure Overview</h2>
+      <p class="section-lead">How things fit together, at a glance.</p>
+      <div class="grid grid-4 infra-grid">
+        <div class="infra-item">
+          <div class="infra-dot"></div>
+          <h4>Edge / DNS</h4>
+          <p>Domain resolution and routing to origin servers.</p>
+        </div>
+        <div class="infra-item">
+          <div class="infra-dot"></div>
+          <h4>TLS Termination</h4>
+          <p>Certificates issued and renewed for every managed domain.</p>
+        </div>
+        <div class="infra-item">
+          <div class="infra-dot"></div>
+          <h4>Application Servers</h4>
+          <p>Web, API, and background-process hosting.</p>
+        </div>
+        <div class="infra-item">
+          <div class="infra-dot"></div>
+          <h4>Data &amp; Backups</h4>
+          <p>Databases and files, backed up on a defined schedule.</p>
+        </div>
+      </div>
+      <p class="fine-print">
+        This is a general description of how the platform is organized. It does not represent
+        live topology data or a real-time network map.
+      </p>
+    </div>
+  </section>
+
+  <!-- STATUS -->
+  <section id="status" class="section section-alt">
+    <div class="container">
+      <h2 class="section-title">System Status</h2>
+      <p class="section-lead">
+        Illustrative status board. This page does not display live, automated monitoring data
+        unless a monitoring integration has been connected — for a current status check, contact support.
+      </p>
+      <div class="status-board">
+        <div class="status-row">
+          <span class="status-dot dot-green"></span>
+          <span class="status-name">Web Hosting</span>
+          <span class="status-label">Operational</span>
+        </div>
+        <div class="status-row">
+          <span class="status-dot dot-green"></span>
+          <span class="status-name">DNS Resolution</span>
+          <span class="status-label">Operational</span>
+        </div>
+        <div class="status-row">
+          <span class="status-dot dot-green"></span>
+          <span class="status-name">SSL / TLS Issuance</span>
+          <span class="status-label">Operational</span>
+        </div>
+        <div class="status-row">
+          <span class="status-dot dot-green"></span>
+          <span class="status-name">Backups</span>
+          <span class="status-label">Operational</span>
+        </div>
+        <div class="status-row">
+          <span class="status-dot dot-green"></span>
+          <span class="status-name">Support Queue</span>
+          <span class="status-label">Operational</span>
+        </div>
+      </div>
+      <a href="#contact" class="btn btn-outline">Check System Status with Support</a>
+    </div>
+  </section>
+
+  <!-- MEDIA SERVER -->
+  <!-- PODCAST (public) -->
+  <section id="podcast" class="section">
+    <div class="container">
+      <h2 class="section-title">Podcast</h2>
+      <p class="section-lead">
+        Episodes and writing hosted on this server. Audio is served directly from
+        this infrastructure — no third-party podcast host in the path.
+      </p>
+
+      <div class="player" id="player" hidden>
+        <div class="player-art-wrap">
+          <img class="player-art" id="playerArt" alt="" hidden>
+          <div class="player-art-fallback" id="playerArtFallback" aria-hidden="true"></div>
+        </div>
+        <div class="player-main">
+          <p class="player-eyebrow">Now playing</p>
+          <h3 class="player-title" id="playerTitle"></h3>
+          <p class="player-desc" id="playerDesc"></p>
+
+          <div class="player-seek">
+            <span class="player-time" id="playerCurrent">0:00</span>
+            <input class="player-range" id="playerSeek" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek within episode">
+            <span class="player-time" id="playerDuration">0:00</span>
+          </div>
+
+          <div class="player-controls">
+            <button class="player-btn" id="playerBack" type="button" aria-label="Back 15 seconds">&#8630;&nbsp;15</button>
+            <button class="player-btn player-btn-main" id="playerToggle" type="button" aria-label="Play">Play</button>
+            <button class="player-btn" id="playerFwd" type="button" aria-label="Forward 30 seconds">30&nbsp;&#8631;</button>
+            <button class="player-btn" id="playerSpeed" type="button" aria-label="Playback speed">1&times;</button>
+            <label class="player-volume">
+              <span class="visually-hidden">Volume</span>
+              <input class="player-range" id="playerVolume" type="range" min="0" max="100" value="100" step="1" aria-label="Volume">
+            </label>
+            <a class="player-btn" id="playerDownload" download>Download</a>
+          </div>
+          <p class="player-error" id="playerError" hidden>That episode could not be played.</p>
+        </div>
+      </div>
+      <audio id="playerAudio" preload="metadata"></audio>
+
+      <h3 class="portal-list-title">Episodes</h3>
+      <div class="episode-list" id="publicEpisodeList">
+        <p class="fine-print">Loading episodes…</p>
+      </div>
+
+      <h3 class="portal-list-title" style="margin-top:40px;">Articles</h3>
+      <div class="article-list" id="publicArticleList">
+        <p class="fine-print">Loading articles…</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="media" class="section">
+    <div class="container">
+      <h2 class="section-title">Media Server — VirtualDJ Control</h2>
+      <p class="section-lead">
+        A real, authenticated control surface for the VirtualDJ instance connected to this
+        infrastructure. Requires a valid access token — nothing here works without one, and
+        no control is shown unless it is actually implemented by the connected agent.
+      </p>
+
+      <div id="mediaLocked" class="media-gate">
+        <div class="form-row">
+          <label for="mediaToken">Access Token</label>
+          <input id="mediaToken" type="password" autocomplete="off" placeholder="API token">
+        </div>
+        <button id="mediaUnlock" class="btn btn-primary" type="button">Unlock Control Panel</button>
+        <p id="mediaGateError" class="media-error" hidden>Could not reach the media server with that token.</p>
+      </div>
+
+      <div id="mediaPanel" class="media-panel" hidden>
+        <div class="media-status-bar">
+          <span class="status-dot" id="mediaStatusDot"></span>
+          <span id="mediaStatusText">Checking connection…</span>
+          <button id="mediaRefresh" class="btn btn-outline btn-small" type="button">Refresh Status</button>
+          <button id="mediaLock" class="btn btn-ghost btn-small" type="button">Lock</button>
+        </div>
+
+        <div class="grid grid-2 media-decks">
+          <div class="deck-panel">
+            <h3>Deck A</h3>
+            <div class="deck-buttons">
+              <button class="btn btn-outline" data-action="transport" data-deck="A" data-transport="play">Play</button>
+              <button class="btn btn-outline" data-action="transport" data-deck="A" data-transport="cue">Cue</button>
+              <button class="btn btn-outline" data-action="transport" data-deck="A" data-transport="stop">Stop</button>
+              <button class="btn btn-outline" data-action="transport" data-deck="A" data-transport="sync">Sync</button>
+              <button class="btn btn-outline" data-action="transport" data-deck="A" data-transport="loop">Loop</button>
+              <button class="btn btn-outline" data-action="transport" data-deck="A" data-transport="nudge_left">Nudge −</button>
+              <button class="btn btn-outline" data-action="transport" data-deck="A" data-transport="nudge_right">Nudge +</button>
+              <button class="btn btn-outline" data-action="transport" data-deck="A" data-transport="pitch_reset">Pitch Reset</button>
+            </div>
+          </div>
+          <div class="deck-panel">
+            <h3>Deck B</h3>
+            <div class="deck-buttons">
+              <button class="btn btn-outline" data-action="transport" data-deck="B" data-transport="play">Play</button>
+              <button class="btn btn-outline" data-action="transport" data-deck="B" data-transport="cue">Cue</button>
+              <button class="btn btn-outline" data-action="transport" data-deck="B" data-transport="stop">Stop</button>
+              <button class="btn btn-outline" data-action="transport" data-deck="B" data-transport="sync">Sync</button>
+              <button class="btn btn-outline" data-action="transport" data-deck="B" data-transport="loop">Loop</button>
+              <button class="btn btn-outline" data-action="transport" data-deck="B" data-transport="nudge_left">Nudge −</button>
+              <button class="btn btn-outline" data-action="transport" data-deck="B" data-transport="nudge_right">Nudge +</button>
+              <button class="btn btn-outline" data-action="transport" data-deck="B" data-transport="pitch_reset">Pitch Reset</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="media-global">
+          <button class="btn btn-primary" data-action="mix_now">Mix Now</button>
+          <button class="btn btn-primary" data-action="emergency_play">Emergency Play</button>
+        </div>
+
+        <p id="mediaActionLog" class="media-log" aria-live="polite"></p>
+
+        <p class="fine-print">
+          Supported actions: per-deck transport (play, cue, stop, sync, loop, nudge, pitch reset),
+          Mix Now, and Emergency Play. Upload, playlist management, video controls, DAW features,
+          and full mixer control are not implemented by the connected agent and are not shown here.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOCS -->
+  <section id="docs" class="section">
+    <div class="container">
+      <h2 class="section-title">Documentation Center</h2>
+      <p class="section-lead">Reference material for getting set up and staying supported.</p>
+      <div class="grid grid-3">
+        <a class="doc-card" href="#contact">
+          <h4>Getting Started</h4>
+          <p>Account setup, initial configuration, and first deployment.</p>
+        </a>
+        <a class="doc-card" href="#contact">
+          <h4>DNS &amp; Domains</h4>
+          <p>Adding domains, editing zone records, and propagation timing.</p>
+        </a>
+        <a class="doc-card" href="#contact">
+          <h4>SSL / TLS Setup</h4>
+          <p>Issuing certificates and enforcing HTTPS on your domain.</p>
+        </a>
+        <a class="doc-card" href="#contact">
+          <h4>Deployments</h4>
+          <p>Git-based deploys, manual uploads, and rollback procedures.</p>
+        </a>
+        <a class="doc-card" href="#contact">
+          <h4>Backups &amp; Restore</h4>
+          <p>Backup schedules and how to request a restore.</p>
+        </a>
+        <a class="doc-card" href="#contact">
+          <h4>Security Practices</h4>
+          <p>Access control, patching cadence, and incident reporting.</p>
+        </a>
+      </div>
+      <p class="fine-print">Full documentation is provided during onboarding and available through support.</p>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="section section-alt">
+    <div class="container">
+      <h2 class="section-title">Frequently Asked Questions</h2>
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary>What kinds of sites and apps can be hosted here?</summary>
+          <p>Static sites, CMS-driven sites, and application backends including Node.js services and APIs.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Can you manage my DNS and domain for me?</summary>
+          <p>Yes — DNS zone configuration and domain guidance are handled as part of onboarding and support.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Do you provide SSL certificates?</summary>
+          <p>Yes, certificates are issued and renewed for managed domains, with HTTPS enforced.</p>
+        </details>
+        <details class="faq-item">
+          <summary>How are backups handled?</summary>
+          <p>Backups run on a defined schedule with documented restore steps. Specific frequency depends on your plan.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Is there real-time monitoring and alerting?</summary>
+          <p>Monitoring can be configured per service. This site's Status section is illustrative, not a live feed, unless a monitoring integration is explicitly connected for your account.</p>
+        </details>
+        <details class="faq-item">
+          <summary>How do I get support?</summary>
+          <p>Use the contact form below, or reach out through your assigned support contact once onboarded.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTACT -->
+  <section id="contact" class="section">
+    <div class="container">
+      <h2 class="section-title">Contact Support</h2>
+      <p class="section-lead">Questions about hosting, domains, deployments, or anything else — reach out below.</p>
+      <form class="contact-form" action="mailto:support@shealthmedia.org" method="post" enctype="text/plain">
+        <div class="form-row">
+          <label for="name">Name</label>
+          <input id="name" name="name" type="text" required>
+        </div>
+        <div class="form-row">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required>
+        </div>
+        <div class="form-row">
+          <label for="topic">Topic</label>
+          <select id="topic" name="topic">
+            <option>General inquiry</option>
+            <option>Hosting &amp; plans</option>
+            <option>Domains &amp; DNS</option>
+            <option>SSL / TLS</option>
+            <option>Deployments</option>
+            <option>Backups &amp; restore</option>
+            <option>Security</option>
+            <option>Technical support</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="message">Message</label>
+          <textarea id="message" name="message" rows="5" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Send Message</button>
+        <p class="fine-print">Submitting opens your email client to send this message to support@shealthmedia.org.</p>
+      </form>
+    </div>
+  </section>
+
+  <!-- CLIENT PORTAL (hidden until signed in) -->
+  <section id="portal" class="section section-alt" hidden>
+    <div class="container">
+      <div class="portal-bar">
+        <div>
+          <h2 class="section-title">Client Portal</h2>
+          <p class="section-lead">Publish podcast episodes and articles. Anything you publish here is live immediately.</p>
+        </div>
+        <button id="portalLogout" class="btn btn-ghost btn-small" type="button">Sign out</button>
+      </div>
+
+      <div class="portal-tabs" role="tablist" aria-label="Portal sections">
+        <button class="portal-tab is-active" data-tab="episodes" type="button" role="tab" aria-selected="true">Episodes</button>
+        <button class="portal-tab" data-tab="articles" type="button" role="tab" aria-selected="false">Articles</button>
+      </div>
+
+      <!-- EPISODES -->
+      <div class="portal-pane" data-pane="episodes">
+        <form id="episodeForm" class="portal-form">
+          <h3>New episode</h3>
+          <div class="form-row">
+            <label for="epTitle">Title</label>
+            <input id="epTitle" type="text" required>
+          </div>
+          <div class="form-row">
+            <label for="epDesc">Description</label>
+            <textarea id="epDesc" rows="4"></textarea>
+          </div>
+          <div class="form-row">
+            <label for="epAudio">Audio file <span class="fine-print">(required, max 300&nbsp;MB)</span></label>
+            <input id="epAudio" type="file" accept="audio/*" required>
+          </div>
+          <div class="form-row">
+            <label for="epCover">Cover image <span class="fine-print">(optional)</span></label>
+            <input id="epCover" type="file" accept="image/*">
+          </div>
+          <button class="btn btn-primary" id="epSubmit" type="submit">Publish episode</button>
+          <div class="portal-progress" id="epProgress" hidden><div class="portal-progress-bar" id="epProgressBar"></div></div>
+          <p class="portal-msg" id="epMsg" aria-live="polite"></p>
+        </form>
+        <h3 class="portal-list-title">Published episodes</h3>
+        <div class="portal-list" id="episodeList"></div>
+      </div>
+
+      <!-- ARTICLES -->
+      <div class="portal-pane" data-pane="articles" hidden>
+        <form id="articleForm" class="portal-form">
+          <h3>New article</h3>
+          <div class="form-row">
+            <label for="arTitle">Title</label>
+            <input id="arTitle" type="text" required>
+          </div>
+          <div class="form-row">
+            <label for="arBody">Body</label>
+            <textarea id="arBody" rows="8" required></textarea>
+          </div>
+          <div class="form-row">
+            <label for="arCover">Cover image <span class="fine-print">(optional)</span></label>
+            <input id="arCover" type="file" accept="image/*">
+          </div>
+          <button class="btn btn-primary" id="arSubmit" type="submit">Publish article</button>
+          <div class="portal-progress" id="arProgress" hidden><div class="portal-progress-bar" id="arProgressBar"></div></div>
+          <p class="portal-msg" id="arMsg" aria-live="polite"></p>
+        </form>
+        <h3 class="portal-list-title">Published articles</h3>
+        <div class="portal-list" id="articleList"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div>
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        server<span class="brand-dim">.shealthmedia.org</span>
+      </div>
+      <p class="fine-print">Network infrastructure &amp; hosting.</p>
+    </div>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="#services">Services</a>
+      <a href="#plans">Plans</a>
+      <a href="#status">Status</a>
+      <a href="#podcast">Podcast</a>
+      <a href="#docs">Docs</a>
+      <a href="#faq">FAQ</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </div>
+</footer>
+
+<div class="modal-backdrop" id="loginModalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+    <h3 id="loginModalTitle">Client Login</h3>
+    <p>Sign in to publish and manage podcast episodes and articles.</p>
+    <form id="loginForm">
+      <div class="form-row">
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
+      </div>
+      <p id="loginError" class="media-error" hidden>Incorrect password.</p>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="loginSubmit" type="submit">Sign in</button>
+        <button class="btn btn-ghost" id="loginModalClose" type="button">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

@@ -9,35 +9,47 @@
  * server are forwarded down that socket, the Mac agent executes
  * them (via AppleScript keystrokes into VirtualDJ) and acks back.
  *
- * Also logs every command to a local SQLite database ("database
- * access" — swap DB_PATH / the sqlite calls for your Postgres/MySQL
- * setup if this server already runs one).
+ * Persistence is Supabase: Postgres holds the command log and the
+ * podcast content (episodes, articles), and Supabase Storage holds the
+ * uploaded audio and cover images. Media is served straight from
+ * Storage's public CDN URLs, so podcast audio never goes through this
+ * process or the web host's disk.
  *
  * Env vars:
- *   PORT             HTTP port to listen on (default 3000)
- *   RELAY_TOKEN       shared secret the Mac agent must present to
- *                     connect (required)
- *   API_TOKEN         shared secret HTTP clients must present to
- *                     issue commands (required — separate from
- *                     RELAY_TOKEN so you can rotate independently)
- *   DB_PATH           sqlite file path (default ./virtualdj.db)
+ *   PORT                  HTTP port to listen on (default 3000)
+ *   RELAY_TOKEN           shared secret the Mac agent must present to
+ *                         connect (required)
+ *   API_TOKEN             shared secret HTTP clients must present to
+ *                         issue commands (required — separate from
+ *                         RELAY_TOKEN so you can rotate independently)
+ *   CLIENT_PASSWORD       password for the website's client portal
+ *                         (required)
+ *   SUPABASE_URL          Supabase project URL (required)
+ *   SUPABASE_SERVICE_KEY  service_role key — server-side only, never
+ *                         ship this to the browser (required)
+ *   SUPABASE_BUCKET       Storage bucket for media (default "podcast")
+ *   TMP_UPLOAD_DIR        scratch dir for in-flight uploads
+ *                         (default <os tmp>/shm-uploads)
  */
 
 const express = require("express");
 const http = require("http");
 const { WebSocketServer } = require("ws");
 const crypto = require("crypto");
-const Database = require("better-sqlite3");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const multer = require("multer");
+const { createClient } = require("@supabase/supabase-js");
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const RELAY_TOKEN = process.env.RELAY_TOKEN;
 const API_TOKEN = process.env.API_TOKEN;
 const CLIENT_PASSWORD = process.env.CLIENT_PASSWORD;
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, "virtualdj.db");
-const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, "uploads");
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const SUPABASE_BUCKET = process.env.SUPABASE_BUCKET || "podcast";
+const TMP_UPLOAD_DIR = process.env.TMP_UPLOAD_DIR || path.join(os.tmpdir(), "shm-uploads");
 
 if (!RELAY_TOKEN || !API_TOKEN) {
   console.error("RELAY_TOKEN and API_TOKEN env vars are required. Refusing to start with no auth.");
@@ -47,67 +59,74 @@ if (!CLIENT_PASSWORD) {
   console.error("CLIENT_PASSWORD env var is required. Refusing to start with no auth.");
   process.exit(1);
 }
-
-fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-
-// --- database (command log) -------------------------------------------
-const db = new Database(DB_PATH);
-db.exec(`
-  CREATE TABLE IF NOT EXISTS commands (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    endpoint TEXT NOT NULL,
-    payload TEXT NOT NULL,
-    status TEXT NOT NULL,
-    response TEXT,
-    duration_ms INTEGER
-  )
-`);
-const insertCommand = db.prepare(
-  `INSERT INTO commands (endpoint, payload, status, response, duration_ms) VALUES (?, ?, ?, ?, ?)`
-);
-
-// --- database (podcast content) -----------------------------------------
-db.exec(`
-  CREATE TABLE IF NOT EXISTS episodes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    audio_file TEXT NOT NULL,
-    cover_file TEXT,
-    published_at TEXT NOT NULL DEFAULT (datetime('now')),
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-  CREATE TABLE IF NOT EXISTS articles (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    body TEXT NOT NULL DEFAULT '',
-    cover_file TEXT,
-    published_at TEXT NOT NULL DEFAULT (datetime('now')),
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-`);
-
-// --- client login sessions (in-memory; single shared client password) ---
-// Not a per-user account system — one password for the site owner/client,
-// checked server-side, backing a random bearer token kept in memory only.
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
-const sessions = new Map(); // token -> expiresAt
-
-function createSession() {
-  const token = crypto.randomBytes(24).toString("hex");
-  sessions.set(token, Date.now() + SESSION_TTL_MS);
-  return token;
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  console.error("SUPABASE_URL and SUPABASE_SERVICE_KEY env vars are required. Refusing to start with no database.");
+  process.exit(1);
 }
 
-function checkClientAuth(req, res, next) {
-  const token = req.headers["x-client-token"];
-  const expiresAt = token && sessions.get(token);
-  if (!expiresAt || expiresAt < Date.now()) {
-    if (token) sessions.delete(token);
-    return res.status(401).json({ error: "not logged in" });
+fs.mkdirSync(TMP_UPLOAD_DIR, { recursive: true });
+
+// --- Supabase (database + object storage) -------------------------------
+// The service_role key bypasses RLS, so every table below stays locked
+// down to server-side access only (see supabase/schema.sql).
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+// Logging a command must never fail the command itself.
+async function logCommand(endpoint, payload, status, response, durationMs) {
+  const { error } = await supabase.from("commands").insert({
+    endpoint,
+    payload: JSON.stringify(payload ?? {}),
+    status,
+    response: typeof response === "string" ? response : JSON.stringify(response ?? {}),
+    duration_ms: durationMs,
+  });
+  if (error) console.error("command log insert failed:", error.message);
+}
+
+// --- storage helpers ----------------------------------------------------
+function publicUrl(key) {
+  if (!key) return null;
+  return supabase.storage.from(SUPABASE_BUCKET).getPublicUrl(key).data.publicUrl;
+}
+
+// Streams a finished multer temp file into Storage, then removes the temp
+// copy either way, so a failed upload can't leave the disk filling up.
+async function putObject(file, prefix) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const key = `${prefix}/${crypto.randomUUID()}${ext}`;
+  try {
+    const body = await fs.promises.readFile(file.path);
+    const { error } = await supabase.storage
+      .from(SUPABASE_BUCKET)
+      .upload(key, body, { contentType: file.mimetype, upsert: false });
+    if (error) throw new Error(`storage upload failed: ${error.message}`);
+    return key;
+  } finally {
+    await fs.promises.rm(file.path, { force: true }).catch(() => {});
   }
-  next();
+}
+
+async function removeObjects(keys) {
+  const list = (keys || []).filter(Boolean);
+  if (!list.length) return;
+  const { error } = await supabase.storage.from(SUPABASE_BUCKET).remove(list);
+  if (error) console.error("storage delete failed:", error.message);
+}
+
+async function discardUploads(files) {
+  for (const list of Object.values(files || {})) {
+    for (const f of list) await fs.promises.rm(f.path, { force: true }).catch(() => {});
+  }
+}
+
+// Rows carry storage keys; the browser gets ready-to-use public URLs.
+function withUrls(row) {
+  const out = { ...row };
+  if ("audio_path" in row) out.audio_url = publicUrl(row.audio_path);
+  if ("cover_path" in row) out.cover_url = publicUrl(row.cover_path);
+  return out;
 }
 
 // --- agent connection registry -----------------------------------------
@@ -166,11 +185,11 @@ async function handleCommand(req, res, endpoint, message, defaultAgentId = "defa
   try {
     const response = await sendCommandToAgent(agentId, message);
     const duration = Date.now() - start;
-    insertCommand.run(endpoint, JSON.stringify(req.body || req.query), "ok", JSON.stringify(response), duration);
+    await logCommand(endpoint, req.body || req.query, "ok", response, duration);
     res.json({ ok: true, ...response });
   } catch (err) {
     const duration = Date.now() - start;
-    insertCommand.run(endpoint, JSON.stringify(req.body || req.query), "error", err.message, duration);
+    await logCommand(endpoint, req.body || req.query, "error", err.message, duration);
     res.status(502).json({ ok: false, error: err.message });
   }
 }
@@ -226,9 +245,11 @@ api.post("/logout", checkClientAuth, (req, res) => {
 });
 
 // --- podcast content ---------------------------------------------------
+// Uploads land in a temp dir first, then move to Storage. Media is served
+// from Storage's public URLs, so there is no /media route here any more.
 const upload = multer({
   storage: multer.diskStorage({
-    destination: UPLOADS_DIR,
+    destination: TMP_UPLOAD_DIR,
     filename: (req, file, cb) => {
       const ext = path.extname(file.originalname).toLowerCase();
       cb(null, `${crypto.randomUUID()}${ext}`);
@@ -242,75 +263,112 @@ const upload = multer({
   },
 });
 
-api.get("/media/:filename", (req, res) => {
-  const filename = path.basename(req.params.filename); // no path traversal
-  const filePath = path.join(UPLOADS_DIR, filename);
-  if (!fs.existsSync(filePath)) return res.status(404).end();
-  res.sendFile(filePath);
-});
-
-api.get("/podcast/episodes", (req, res) => {
-  const rows = db.prepare(`SELECT * FROM episodes ORDER BY published_at DESC`).all();
-  res.json({ ok: true, episodes: rows });
+api.get("/podcast/episodes", async (req, res) => {
+  const { data, error } = await supabase
+    .from("episodes")
+    .select("*")
+    .order("published_at", { ascending: false });
+  if (error) return res.status(500).json({ ok: false, error: error.message });
+  res.json({ ok: true, episodes: data.map(withUrls) });
 });
 
 api.post(
   "/podcast/episodes",
   checkClientAuth,
   upload.fields([{ name: "audio", maxCount: 1 }, { name: "cover", maxCount: 1 }]),
-  (req, res) => {
+  async (req, res) => {
     const { title, description } = req.body;
-    const audioFile = req.files?.audio?.[0]?.filename;
-    const coverFile = req.files?.cover?.[0]?.filename;
-    if (!title || !audioFile) {
+    const audio = req.files?.audio?.[0];
+    const cover = req.files?.cover?.[0];
+    if (!title || !audio) {
+      await discardUploads(req.files);
       return res.status(400).json({ ok: false, error: "title and audio file are required" });
     }
-    const info = db
-      .prepare(`INSERT INTO episodes (title, description, audio_file, cover_file) VALUES (?, ?, ?, ?)`)
-      .run(title, description || "", audioFile, coverFile || null);
-    res.json({ ok: true, id: info.lastInsertRowid });
+    let audioPath = null;
+    let coverPath = null;
+    try {
+      audioPath = await putObject(audio, "episodes/audio");
+      if (cover) coverPath = await putObject(cover, "episodes/covers");
+      const { data, error } = await supabase
+        .from("episodes")
+        .insert({ title, description: description || "", audio_path: audioPath, cover_path: coverPath })
+        .select("id")
+        .single();
+      if (error) throw new Error(error.message);
+      res.json({ ok: true, id: data.id });
+    } catch (err) {
+      // Don't leave orphaned objects behind if the row insert failed.
+      await removeObjects([audioPath, coverPath]);
+      await discardUploads(req.files);
+      res.status(500).json({ ok: false, error: err.message });
+    }
   }
 );
 
-api.delete("/podcast/episodes/:id", checkClientAuth, (req, res) => {
-  const row = db.prepare(`SELECT * FROM episodes WHERE id = ?`).get(req.params.id);
+api.delete("/podcast/episodes/:id", checkClientAuth, async (req, res) => {
+  const { data: row, error: findErr } = await supabase
+    .from("episodes").select("*").eq("id", req.params.id).maybeSingle();
+  if (findErr) return res.status(500).json({ ok: false, error: findErr.message });
   if (!row) return res.status(404).json({ ok: false, error: "not found" });
-  for (const f of [row.audio_file, row.cover_file]) {
-    if (f) fs.rm(path.join(UPLOADS_DIR, f), { force: true }, () => {});
-  }
-  db.prepare(`DELETE FROM episodes WHERE id = ?`).run(req.params.id);
+  await removeObjects([row.audio_path, row.cover_path]);
+  const { error } = await supabase.from("episodes").delete().eq("id", req.params.id);
+  if (error) return res.status(500).json({ ok: false, error: error.message });
   res.json({ ok: true });
 });
 
-api.get("/podcast/articles", (req, res) => {
-  const rows = db.prepare(`SELECT * FROM articles ORDER BY published_at DESC`).all();
-  res.json({ ok: true, articles: rows });
+api.get("/podcast/articles", async (req, res) => {
+  const { data, error } = await supabase
+    .from("articles")
+    .select("*")
+    .order("published_at", { ascending: false });
+  if (error) return res.status(500).json({ ok: false, error: error.message });
+  res.json({ ok: true, articles: data.map(withUrls) });
 });
 
-api.post("/podcast/articles", checkClientAuth, upload.fields([{ name: "cover", maxCount: 1 }]), (req, res) => {
+api.post("/podcast/articles", checkClientAuth, upload.fields([{ name: "cover", maxCount: 1 }]), async (req, res) => {
   const { title, body } = req.body;
-  const coverFile = req.files?.cover?.[0]?.filename;
+  const cover = req.files?.cover?.[0];
   if (!title || !body) {
+    await discardUploads(req.files);
     return res.status(400).json({ ok: false, error: "title and body are required" });
   }
-  const info = db
-    .prepare(`INSERT INTO articles (title, body, cover_file) VALUES (?, ?, ?)`)
-    .run(title, body, coverFile || null);
-  res.json({ ok: true, id: info.lastInsertRowid });
+  let coverPath = null;
+  try {
+    if (cover) coverPath = await putObject(cover, "articles/covers");
+    const { data, error } = await supabase
+      .from("articles")
+      .insert({ title, body, cover_path: coverPath })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    res.json({ ok: true, id: data.id });
+  } catch (err) {
+    await removeObjects([coverPath]);
+    await discardUploads(req.files);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
-api.delete("/podcast/articles/:id", checkClientAuth, (req, res) => {
-  const row = db.prepare(`SELECT * FROM articles WHERE id = ?`).get(req.params.id);
+api.delete("/podcast/articles/:id", checkClientAuth, async (req, res) => {
+  const { data: row, error: findErr } = await supabase
+    .from("articles").select("*").eq("id", req.params.id).maybeSingle();
+  if (findErr) return res.status(500).json({ ok: false, error: findErr.message });
   if (!row) return res.status(404).json({ ok: false, error: "not found" });
-  if (row.cover_file) fs.rm(path.join(UPLOADS_DIR, row.cover_file), { force: true }, () => {});
-  db.prepare(`DELETE FROM articles WHERE id = ?`).run(req.params.id);
+  await removeObjects([row.cover_path]);
+  const { error } = await supabase.from("articles").delete().eq("id", req.params.id);
+  if (error) return res.status(500).json({ ok: false, error: error.message });
   res.json({ ok: true });
 });
 
-api.get("/history", checkApiAuth, (req, res) => {
+api.get("/history", checkApiAuth, async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit || "50", 10), 500);
-  const rows = db.prepare(`SELECT * FROM commands ORDER BY id DESC LIMIT ?`).all(limit);
-  res.json({ ok: true, rows });
+  const { data, error } = await supabase
+    .from("commands")
+    .select("*")
+    .order("id", { ascending: false })
+    .limit(limit);
+  if (error) return res.status(500).json({ ok: false, error: error.message });
+  res.json({ ok: true, rows: data });
 });
 
 // --- WebSocket server (Mac agent connects here) --------------------------
