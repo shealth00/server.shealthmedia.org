@@ -29,16 +29,26 @@ const { WebSocketServer } = require("ws");
 const crypto = require("crypto");
 const Database = require("better-sqlite3");
 const path = require("path");
+const fs = require("fs");
+const multer = require("multer");
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const RELAY_TOKEN = process.env.RELAY_TOKEN;
 const API_TOKEN = process.env.API_TOKEN;
+const CLIENT_PASSWORD = process.env.CLIENT_PASSWORD;
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, "virtualdj.db");
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, "uploads");
 
 if (!RELAY_TOKEN || !API_TOKEN) {
   console.error("RELAY_TOKEN and API_TOKEN env vars are required. Refusing to start with no auth.");
   process.exit(1);
 }
+if (!CLIENT_PASSWORD) {
+  console.error("CLIENT_PASSWORD env var is required. Refusing to start with no auth.");
+  process.exit(1);
+}
+
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // --- database (command log) -------------------------------------------
 const db = new Database(DB_PATH);
@@ -56,6 +66,49 @@ db.exec(`
 const insertCommand = db.prepare(
   `INSERT INTO commands (endpoint, payload, status, response, duration_ms) VALUES (?, ?, ?, ?, ?)`
 );
+
+// --- database (podcast content) -----------------------------------------
+db.exec(`
+  CREATE TABLE IF NOT EXISTS episodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    audio_file TEXT NOT NULL,
+    cover_file TEXT,
+    published_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS articles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    cover_file TEXT,
+    published_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
+// --- client login sessions (in-memory; single shared client password) ---
+// Not a per-user account system — one password for the site owner/client,
+// checked server-side, backing a random bearer token kept in memory only.
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const sessions = new Map(); // token -> expiresAt
+
+function createSession() {
+  const token = crypto.randomBytes(24).toString("hex");
+  sessions.set(token, Date.now() + SESSION_TTL_MS);
+  return token;
+}
+
+function checkClientAuth(req, res, next) {
+  const token = req.headers["x-client-token"];
+  const expiresAt = token && sessions.get(token);
+  if (!expiresAt || expiresAt < Date.now()) {
+    if (token) sessions.delete(token);
+    return res.status(401).json({ error: "not logged in" });
+  }
+  next();
+}
 
 // --- agent connection registry -----------------------------------------
 // Only one Mac agent is expected, but this supports multiple named
@@ -156,6 +209,102 @@ api.all("/key", checkApiAuth, (req, res) => {
 api.all("/gb/transport", checkApiAuth, (req, res) => {
   const action = req.query.action || req.body.action;
   handleCommand(req, res, "/gb/transport", { type: "gb_transport", action }, "garageband");
+});
+
+// --- client login ----------------------------------------------------------
+api.post("/login", (req, res) => {
+  const password = req.body?.password;
+  if (password !== CLIENT_PASSWORD) {
+    return res.status(401).json({ ok: false, error: "incorrect password" });
+  }
+  res.json({ ok: true, token: createSession() });
+});
+
+api.post("/logout", checkClientAuth, (req, res) => {
+  sessions.delete(req.headers["x-client-token"]);
+  res.json({ ok: true });
+});
+
+// --- podcast content ---------------------------------------------------
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: UPLOADS_DIR,
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `${crypto.randomUUID()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 300 * 1024 * 1024 }, // 300MB, generous for podcast audio
+  fileFilter: (req, file, cb) => {
+    const okAudio = file.fieldname === "audio" && /^audio\//.test(file.mimetype);
+    const okImage = file.fieldname === "cover" && /^image\//.test(file.mimetype);
+    cb(null, okAudio || okImage);
+  },
+});
+
+api.get("/media/:filename", (req, res) => {
+  const filename = path.basename(req.params.filename); // no path traversal
+  const filePath = path.join(UPLOADS_DIR, filename);
+  if (!fs.existsSync(filePath)) return res.status(404).end();
+  res.sendFile(filePath);
+});
+
+api.get("/podcast/episodes", (req, res) => {
+  const rows = db.prepare(`SELECT * FROM episodes ORDER BY published_at DESC`).all();
+  res.json({ ok: true, episodes: rows });
+});
+
+api.post(
+  "/podcast/episodes",
+  checkClientAuth,
+  upload.fields([{ name: "audio", maxCount: 1 }, { name: "cover", maxCount: 1 }]),
+  (req, res) => {
+    const { title, description } = req.body;
+    const audioFile = req.files?.audio?.[0]?.filename;
+    const coverFile = req.files?.cover?.[0]?.filename;
+    if (!title || !audioFile) {
+      return res.status(400).json({ ok: false, error: "title and audio file are required" });
+    }
+    const info = db
+      .prepare(`INSERT INTO episodes (title, description, audio_file, cover_file) VALUES (?, ?, ?, ?)`)
+      .run(title, description || "", audioFile, coverFile || null);
+    res.json({ ok: true, id: info.lastInsertRowid });
+  }
+);
+
+api.delete("/podcast/episodes/:id", checkClientAuth, (req, res) => {
+  const row = db.prepare(`SELECT * FROM episodes WHERE id = ?`).get(req.params.id);
+  if (!row) return res.status(404).json({ ok: false, error: "not found" });
+  for (const f of [row.audio_file, row.cover_file]) {
+    if (f) fs.rm(path.join(UPLOADS_DIR, f), { force: true }, () => {});
+  }
+  db.prepare(`DELETE FROM episodes WHERE id = ?`).run(req.params.id);
+  res.json({ ok: true });
+});
+
+api.get("/podcast/articles", (req, res) => {
+  const rows = db.prepare(`SELECT * FROM articles ORDER BY published_at DESC`).all();
+  res.json({ ok: true, articles: rows });
+});
+
+api.post("/podcast/articles", checkClientAuth, upload.fields([{ name: "cover", maxCount: 1 }]), (req, res) => {
+  const { title, body } = req.body;
+  const coverFile = req.files?.cover?.[0]?.filename;
+  if (!title || !body) {
+    return res.status(400).json({ ok: false, error: "title and body are required" });
+  }
+  const info = db
+    .prepare(`INSERT INTO articles (title, body, cover_file) VALUES (?, ?, ?)`)
+    .run(title, body, coverFile || null);
+  res.json({ ok: true, id: info.lastInsertRowid });
+});
+
+api.delete("/podcast/articles/:id", checkClientAuth, (req, res) => {
+  const row = db.prepare(`SELECT * FROM articles WHERE id = ?`).get(req.params.id);
+  if (!row) return res.status(404).json({ ok: false, error: "not found" });
+  if (row.cover_file) fs.rm(path.join(UPLOADS_DIR, row.cover_file), { force: true }, () => {});
+  db.prepare(`DELETE FROM articles WHERE id = ?`).run(req.params.id);
+  res.json({ ok: true });
 });
 
 api.get("/history", checkApiAuth, (req, res) => {
