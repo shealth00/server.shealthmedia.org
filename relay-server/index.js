@@ -21,7 +21,25 @@
  *                     issue commands (required — separate from
  *                     RELAY_TOKEN so you can rotate independently)
  *   DB_PATH           sqlite file path (default ./virtualdj.db)
+ *
+ *   Podcast CMS (optional — routes answer 503 until all three are set;
+ *   see podcast.js for the full list):
+ *   CLIENT_PASSWORD       password for the site's client portal login
+ *   SUPABASE_URL          Supabase project URL
+ *   SUPABASE_SERVICE_KEY  Supabase service_role key (server-side only)
+ *   SUPABASE_BUCKET       public Storage bucket (default "podcast")
+ *
+ *   SITE_DIR          OPTIONAL local-development convenience: directory of
+ *                     static files to serve at "/" from this process, so the
+ *                     site and its relative "/api" calls share one origin.
+ *                     Disabled unless set. Production serves the site from
+ *                     the webserver instead — leave this unset there.
  */
+
+// Local secrets live in relay-server/.env (gitignored). Loading it here is a
+// no-op when the file is absent, so process-manager-supplied env still wins
+// the way it does in production.
+require("dotenv").config({ path: require("path").join(__dirname, ".env") });
 
 const express = require("express");
 const http = require("http");
@@ -89,6 +107,18 @@ const app = express();
 const api = express.Router();
 app.use(express.json());
 app.use("/api", api);
+
+// Podcast CMS (client portal): /api/login, /api/logout, /api/podcast/*.
+// Mounted on the same router; leaves every existing route untouched.
+require("./podcast").mount(api);
+
+// Optional static site for single-origin local testing. Mounted AFTER the
+// API router so it can never shadow /api/*, and off unless SITE_DIR is set.
+const SITE_DIR = process.env.SITE_DIR || "";
+if (SITE_DIR) {
+  app.use(express.static(SITE_DIR, { extensions: ["html"] }));
+  console.log(`Serving static site from ${SITE_DIR} at / (SITE_DIR set).`);
+}
 
 function checkApiAuth(req, res, next) {
   const provided = req.query.token || req.headers["x-api-token"];
